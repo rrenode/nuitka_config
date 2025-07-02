@@ -1,16 +1,33 @@
+# src/nuitka_config/__init__.py
+
+from .main import run  # CLI entry point
+from .builder import convert_to_nuitka_args, load_spec_file
+from .models import (
+    # Main Config Model
+    NuitkaConfig, 
+    
+    # Its Sub-Models
+    Core, Output, Optimization, 
+    Parallel, Python, Compiler, Plugins, Packages,
+    Data, Debug, Logging,
+    
+    # Choice Models
+    BuildMode,
+    BuildResult,
+    Compilers,
+)
+
+# Use importlib.metadata to resolve version
 import sys
 
 if sys.version_info[:2] >= (3, 8):
-    # TODO: Import directly (no need for conditional) when `python_requires = >= 3.8`
-    from importlib.metadata import PackageNotFoundError, version  # pragma: no cover
+    from importlib.metadata import version, PackageNotFoundError  # pragma: no cover
 else:
-    from importlib_metadata import PackageNotFoundError, version  # pragma: no cover
+    from importlib_metadata import version, PackageNotFoundError  # pragma: no cover
 
 try:
-    # Change here if project is renamed and does not equal the package name
-    dist_name = __name__
-    __version__ = version(dist_name)
+    __version__ = version(nuitka-config)
 except PackageNotFoundError:  # pragma: no cover
-    __version__ = "unknown"
+    __version__ = unknown
 finally:
     del version, PackageNotFoundError
