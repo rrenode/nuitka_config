@@ -374,6 +374,11 @@ class OSControls:
     #=================================================#
     force_stderr: str | None = None
     
+    #=================================================#
+    # Created as a proxy for this config builder.
+    # Options are: WindowsOSControl | MacOSControls | LinuxOSControls
+    # Defaults to default values of current os.
+    #=================================================#
     os_specific: \
         WindowsOSControl | MacOSControls | LinuxOSControls | None = \
             field(
