@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from nuitka_config.utils.export_class import export
+from nuitka_config.utils.platform_tools import pick_for_platform
 
 @export
 class BuildMode(StrEnum):
@@ -217,11 +218,136 @@ class Logging:
     quiet: bool = False
 
 @export
+class WindowsConsoleMode(StrEnum):
+    # creates a console window unless the program was started from one.
+    force = "force"
+    
+    # With 'disable' it doesn't create or use a console at all.
+    disable = "disable"
+    
+    # With 'attach' an existing console will be used for outputs.
+    attach = "attach"
+    
+    # With 'hide' a newly spawned console will be hidden and an already
+    #   existing console will behave like 'force'. 
+    hide = "hide"
+
+@export
 @dataclass
-class BinaryVersionInfo:
-    company_name: str = "UNKNOWN"
-    product_name: str = "MY_PROGRAM"
-    file_version: str = "0.0.0-dev"
+class WindowsOSControl:
+    # Select console mode to use. Default mode is 'force'.
+    console_mode: bool = WindowsConsoleMode.force
+    
+    # Add executable icon. Can be given multiple times for different 
+    #   resolutions or files with multiple icons inside.
+    icon_from_ico: Path | None = None
+    
+    # Copy executable icons from this existing executable (Windows only).
+    icon_from_exe: Path | None = None
+    
+    # When compiling for Windows and onefile, show this
+    #   while loading the application. Defaults to off.
+    slash_screen: str = ""
+    
+    # Request Windows User Control, to grant admin rights on
+    #   execution. (Windows only). Defaults to off.
+    uac_admin: bool = False
+    
+    # Request Windows User Control, to enforce running from 
+    #   a few folders only, remote desktop access. 
+    #   (Windows only). Defaults to off.
+    uac_uiaccess: bool = False
+
+class MacArchTarget(StrEnum):
+    limit = "limit"
+    native = "native"
+
+class MacAppMode(StrEnum):
+    gui = "gui"
+    ui_element = "ui-element"
+    background = "background"
+
+class MacMultipleInstance(StrEnum):
+    off = "off"
+    prevent = "LSMultipleInstancesProhibited"
+
+@export
+class MacOSControls:
+    #=================================================#
+    #When compiling for macOS, create a bundle rather than
+    #   a plain binary application. 
+    # This is the only way to unlock the disabling of console, 
+    #   get high DPI graphics, etc. and implies standalone mode. 
+    # Defaults to off.
+    #=================================================#
+    create_app_bundle: bool = False
+    
+    #=================================================#
+    # What architectures is this to supposed to run on.
+    # Default and limit is what the running Python allows for. 
+    # Default is "native" which is the architecture the Python is run with.
+    #=================================================#
+    target_arch: MacArchTarget = MacArchTarget.native
+    
+    #=================================================#
+    # Add icon for the application bundle to use. 
+    # Can be given only one time. 
+    # Defaults to Python icon if available.
+    #=================================================#
+    app_icon: Path | None = None
+    
+    #=================================================#
+    # Name of the application to use for macOS signing.
+    # Follow "com.YourCompany.AppName" naming results for 
+    #   best results, as these have to be globally unique,
+    #   and will potentially grant protected API accesses.
+    #=================================================#
+    signed_app_name: str | None = None
+    
+    #=================================================#
+    # Name of the product to use in macOS bundle information. 
+    # Defaults to base filename of the binary.
+    #=================================================#
+    app_name: str | None = None
+    
+    #=================================================#
+    # Mode of application for the application bundle. 
+    # When launching a Window, and appearing in Docker is desired, 
+    #   default value "gui" is a good fit. 
+    # Without a Window ever, the application is a "background" application. 
+    # For UI elements that get to display later, "ui-element" is in-between. 
+    # The application will not appear in dock, but get full access to
+    #   desktop when it does open a Window later.
+    #=================================================#
+    app_mode: MacAppMode = MacAppMode.gui
+    
+    #=================================================#
+    # For application bundles, set the flag "LSMultipleInstancesProhibited" 
+    #   to prevent launching multiple instances of the application. 
+    # Default is off.
+    #=================================================#
+    prohibit_multiple_instance: MacMultipleInstance = MacMultipleInstance.off
+    
+    #TODO - MacSignIdentity
+    sign_identity = field(default_factory=NotImplementedError)
+    
+    #TODO - MacSignNotarization
+    sign_notarization = field(default_factory=NotImplementedError)
+    
+    #=================================================#
+    # Product version to use in macOS bundle information.
+    # Defaults to "1.0" if not given.
+    #=================================================#
+    app_version: str = "1.0"
+    
+    #TODO - MacProtectedResource
+    # https://developer.apple.com/documentation/bundleresources/information_property_list/protected_resources
+    protected_resource = field(default_factory=NotImplementedError)
+
+@export
+@dataclass
+class LinuxOSControls:
+    icon_path: Path | None = None
 
 @export
 @dataclass
@@ -247,47 +373,66 @@ class OSControls:
     # Check User Manual for full list of available values.
     #=================================================#
     force_stderr: str | None = None
-
-@export
-class WindowsConsoleMode(StrEnum):
-    # creates a console window unless the program was started from one.
-    force = "force"
     
-    # With 'disable' it doesn't create or use a console at all.
-    disable = "disable"
-    
-    # With 'attach' an existing console will be used for outputs.
-    attach = "attach"
-    
-    # With 'hide' a newly spawned console will be hidden and an already
-    #   existing console will behave like 'force'. 
-    hide = "hide"
+    os_specific: \
+        WindowsOSControl | MacOSControls | LinuxOSControls | None = \
+            field(
+                default_factory=lambda: pick_for_platform(
+                    windows_option=WindowsOSControl,
+                    mac_option=MacOSControls,
+                    linux_option=LinuxOSControls
+                )()
+            )
 
 @export
 @dataclass
-class WindowsOS:
-    # Select console mode to use. Default mode is 'force'.
-    console_mode: bool = WindowsConsoleMode.force
+class BinaryVersionInfo:
+    #=================================================# 
+    # Name of the company to use in version information.
+    # Defaults to unused.
+    #=================================================#
+    company_name: str | None = None
     
-    # Add executable icon. Can be given multiple times for different 
-    #   resolutions or files with multiple icons inside.
-    icon_from_ico: Path | None = None
+    #=================================================#
+    # Name of the product to use in version information.
+    # Defaults to base filename of the binary.
+    #=================================================#
+    product_name: str | None = None
     
-    # Copy executable icons from this existing executable (Windows only).
-    icon_from_exe: Path | None = None
+    #=================================================#
+    # File version to use in version information. 
+    # Must be a sequence of up to 4 numbers, e.g. 1.0 or 1.0.0.0, 
+    #   no more digits are allowed, no strings are allowed.
+    # Defaults to unused.
+    #=================================================#
+    file_version: str | None = None
     
-    # When compiling for Windows and onefile, show this
-    #   while loading the application. Defaults to off.
-    slash_screen: str = ""
+    #=================================================#
+    # Product version to use in version information. 
+    # Same rules as for file version. Defaults to unused.
+    #=================================================#
+    product_version: str | None = None
     
-    # Request Windows User Control, to grant admin rights on
-    #   execution. (Windows only). Defaults to off.
-    uac_admin: bool = False
+    #=================================================#
+    # Description of the file used in version information.
+    # Windows only at this time. 
+    # Defaults to binary filename.
+    #=================================================#
+    file_description: str | None = None
     
-    # Request Windows User Control, to enforce running from 
-    #   a few folders only, remote desktop access. 
-    #   (Windows only). Defaults to off.
-    uac_uiaccess: bool = False
+    #=================================================# 
+    # Copyright used in version information. 
+    # Windows/macOS only at this time. 
+    # Defaults to not present.
+    #=================================================#
+    copyright_text: str | None = None
+    
+    #=================================================#
+    # Trademark used in version information. 
+    # Windows/macOS only at this time. 
+    # Defaults to not present.
+    #=================================================#
+    trademark_text: str | None = None
 
 @export
 @dataclass
