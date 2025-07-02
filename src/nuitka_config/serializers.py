@@ -1,6 +1,13 @@
 from enum import Enum
 from pathlib import Path
 
+def direct_serializer(*, value_transform=None):
+    def serializer(value):
+        if isinstance(value, Enum):
+            value = value.value
+        return [f"--{value}"]
+    return serializer
+
 def path_serializer(cli_name: str, *, value_transform=None):
     def serializer(value: Path):
         return [value.as_posix()]

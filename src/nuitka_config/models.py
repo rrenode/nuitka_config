@@ -6,7 +6,12 @@ from typing import Optional
 from nuitka_config.utils.export_class import export
 from nuitka_config.utils.platform_tools import pick_for_platform
 
-from nuitka_config.serializers import iterable_serializer, bool_flag_serializer, enum_serializer
+from nuitka_config.serializers import (
+    direct_serializer, 
+    iterable_serializer, 
+    bool_flag_serializer, 
+    enum_serializer
+)
     
 #SECTION Python Controls
 @export
@@ -94,6 +99,21 @@ class Packages:
         default=None,
         metadata={
             "serializer": iterable_serializer("include-module")
+        }
+    )
+    
+    #=================================================#
+    # Do not follow to that module name even if used, or 
+    #   if a package name, to the whole package in any case, 
+    #   overrides all other options. 
+    # This can also contain patterns, e.g. "*.tests". 
+    # Can be given multiple times.
+    # Default empty.
+    #=================================================#
+    nofollow_import_to: list[str] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("nofollow-import-to")
         }
     )
 #!SECTION
@@ -1073,6 +1093,112 @@ class BinaryVersionInfo:
     )
 #!SECTION
 
+#SECTION C Compiler Control
+
+@export
+class CompilerChoice(StrEnum):
+    #=================================================#
+    # Enforce the use of clang. 
+    # On Windows this requires a working Visual Studio 
+    #   version to piggy back on.
+    # Defaults to off.
+    #=================================================#
+    clang = "clang"
+    
+    #=================================================#
+    # Enforce the use of MinGW64 on Windows. 
+    # Defaults to off unless MSYS2 with MinGW Python is used.
+    #=================================================#
+    mingw64 = "mingw64"
+    
+    #=================================================#
+    # Enforce the use of specific MSVC version on Windows.
+    # Allowed values are e.g. "14.3" (MSVC 2022) and other
+    #   MSVC version numbers, specify "list" for a list of
+    #   installed compilers, or use "latest".  
+    # Defaults to latest MSVC being used if installed, 
+    #   otherwise MinGW64 is used.
+    #=================================================#
+    msvc = "msvc"
+
+@export
+@dataclass
+class LTOChoice(StrEnum):
+    yes = "yes"
+    no = "no"
+    auto = "auto"
+
+@export
+@dataclass
+class CCompilerControl:
+    #=================================================#
+    #=================================================#
+    compiler: CompilerChoice | str | None = field(
+    default=None,
+    metadata={
+        "serializer": direct_serializer()
+    }
+    )
+     
+    #=================================================#
+    # Specify the allowed number of parallel C compiler jobs. 
+    # Negative values are system CPU minus the given value. 
+    # Defaults to the full system CPU count unless low memory mode 
+    #   is activated, then it defaults to 1.
+    #=================================================#
+    jobs: int | None = field(
+        default=None,
+        metadata={
+            "cli":"jobs"
+        }
+    )
+    
+    #=================================================#
+    #Use link time optimizations (MSVC, gcc, clang). 
+    # Allowed values are "yes", "no", and "auto" 
+    #   (when it's known to work). 
+    # Defaults to "auto".
+    #=================================================#
+    lto: LTOChoice = field(
+        default=LTOChoice.auto,
+        metadata={
+            "serializer": enum_serializer("lto")
+        }
+    )
+#!SECTION
+
+#SECTION Plugin Control
+@export
+@dataclass
+class PluginControl:
+    #=================================================#
+    # Enabled plugins. 
+    # Must be plug-in names. 
+    # Use '--plugin-list' to query the full list and exit. 
+    # Default empty.
+    #=================================================#
+    use_plugins: list[str] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("enable-plugins")
+        }
+    )
+    
+    #=================================================#
+    # Disabled plugins. 
+    # Must be plug-in names. Use '--plugin-list' to query 
+    #   the full list and exit. 
+    # Most standard plugins are not a good idea to disable.
+    # Default empty.
+    #=================================================#
+    disable_plugins: list[str] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("disable-plugins")
+        }
+    )
+#!SECTION
+
 #SECTION Full Config DataClass
   
 @export
@@ -1119,6 +1245,8 @@ class NuitkaConfig:
     dlls: DLLFileControl = field(default_factory=DLLFileControl)
     packages: Packages = field(default_factory=Packages)
     python: PythonControls = field(default_factory=PythonControls)
+    plugins: PluginControl = field(default_factory=PluginControl)
+    compiler: CCompilerControl = field(default_factory=CCompilerControl)
     post_compile: PostCompilation = field(default_factory=PostCompilation)
     os: OSControls = field(default_factory=OSControls)
     binary_versioning: BinaryVersionInfo = field(default_factory=BinaryVersionInfo)
