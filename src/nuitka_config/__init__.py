@@ -1,22 +1,7 @@
 # src/nuitka_config/__init__.py
 
 from .main import run  # CLI entry point
-from .utils.moduletools import collect_submodules
-from .builder import convert_to_nuitka_args, load_spec_file
-from .models import (
-    # Main Config Model
-    NuitkaConfig, 
-    
-    # Its Sub-Models
-    Core, Output, Optimization, 
-    Parallel, Python, Compiler, Plugins, Packages,
-    Data, Debug, Logging,
-    
-    # Choice Models
-    BuildMode,
-    BuildResult,
-    Compilers,
-)
+from .builder import serialize_config, load_spec_file
 
 # Use importlib.metadata to resolve version
 import sys

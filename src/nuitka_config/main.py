@@ -33,8 +33,8 @@ _logger = logging.getLogger(__name__)
 
 def convert_config_to_args(config) -> list[str]:
     """Convert a NuitkaConfig dataclass into CLI arguments."""
-    from nuitka_config import convert_to_nuitka_args
-    return convert_to_nuitka_args(config)
+    from nuitka_config import serialize_config
+    return serialize_config(config)
 
 
 def parse_args(args):
@@ -69,6 +69,17 @@ def setup_logging(loglevel: int):
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+def detect_nuitka():
+    import importlib.util
+    import shutil
+    cli_path = shutil.which("nuitka") 
+    py_module = importlib.util.find_spec("nuitka") is not None
+
+    return {
+        "cli_available": bool(cli_path),
+        "cli_path": cli_path,
+        "module_available": py_module
+    }
 
 def main(args):
     from nuitka_config.builder import load_spec_file
@@ -89,6 +100,16 @@ def main(args):
         cli_args = convert_config_to_args(config)
 
     full_command = parsed_args.nuitka.split() + cli_args
+    
+    nuitka_paths = detect_nuitka()
+    exc = nuitka_paths.get("cli_path")
+    mod = nuitka_paths.get("module_available")
+    if mod:
+        full_command.insert(0, sys.executable)
+        full_command.insert(1, "-m")
+    elif exc:
+        full_command.insert(0, exc)
+
     _logger.debug("Resolved command: %s", full_command)
 
     if parsed_args.export_bat:

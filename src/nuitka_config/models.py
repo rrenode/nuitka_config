@@ -6,216 +6,714 @@ from typing import Optional
 from nuitka_config.utils.export_class import export
 from nuitka_config.utils.platform_tools import pick_for_platform
 
+from nuitka_config.serializers import iterable_serializer, bool_flag_serializer, enum_serializer
+    
+#SECTION Python Controls
 @export
-class BuildMode(StrEnum):
-    #=================================================#
-    # Compiles a Python script into a loadable Python extension module 
-    #   (like .so, .pyd, or .dll depending on OS). No entrypoint is run — 
-    #   instead, you import it from other Python code.
-    #=================================================#
-    module = "module" 
-    
-    #=================================================#
-    # Compiles your Python script into a standalone executable (e.g., .exe, ELF binary). 
-    #   The entrypoint is run like a program.
-    #=================================================#
-    executable = "executable" 
-    
-@export
-class BuildResult(StrEnum):
-    #=================================================#
-    # IDK
-    #=================================================#
-    default = ""
-    
-    #=================================================#
-    # Creates a directory (dist/your_app/) containing:
-    #   - Your app executable
-    #   - All dependencies (Python DLL, packages, plugins, etc.)
-    #   - Portable — but still a folder of files.
-    #
-    # Use this when you want a fully self-contained app that doesn't rely 
-    #   on a system Python install.
-    #=================================================#
-    standalone = "standalone"
-    
-    #=================================================#
-    # Builds on standalone, but compresses everything into a single .exe or binary.
-    # - At runtime, it unpacks the contents into a temporary 
-    #       directory and runs it from there.
-    # - Slightly slower startup, but more portable.
-    #
-    # Use when you want a single-file app for easier distribution.
-    # Implicitly sets standalone = true.
-    #=================================================#
-    onefile = "onefile"
+class PyFlag(StrEnum):
+    no_site = "-s"
+    static_hashes = "static_hashes"
+    no_warnings = "no_warnings"
+    no_asserts = "no_asserts"
+    no_docstrings = "no_docstrings"
+    unbuffered = "-u"
+    isolated = "isolated"
+    package_mode = "-m"
     
 @export
 @dataclass
-class Core:
-    """What you're compiling. Entrypoint and packaging mode.
-    """
-    entry: Path = "main.py"
-    mode: BuildMode = BuildMode.executable
-    result: BuildResult = BuildResult.standalone
-
-@export
-@dataclass
-class Output:
-    """Where output goes and naming behavior.
-    """
-    output_dir: str = "dist"
-    output_filename: Path = "my_program"
-    remove_output: bool = True
-    show_progress: bool = True
-
-@export
-@dataclass
-class Optimization:
-    """Performance-related toggles.
-    """
-    lto: bool = True
-    enable_asserts: bool = True
-    nooptimize: bool = False
-    prefer_source_code: bool = True
-    static_libpython: bool = False
-
-@export
-@dataclass
-class Parallel:
-    """Compilation speed (e.g. --jobs).
-    """
-    jobs: int = 4
-
-@export
-@dataclass
-class Python:
-    """Python version and flags.
-    """
-    python_version = "3.11"
-    flags: list[str] = field(default_factory=lambda: ["no_site"])  # --python-flag=
-
-@export
-class Compilers(StrEnum):
-    mingw64 = "mingw64"
-    clang = "clang"
-    msvc = "msvc"
-    gcc = "gcc"
-
-@export
-@dataclass
-class Compiler:
-    """Control C compiler backend and build mechanics.
-    """
-    backend: Optional[Compilers] = None  # Choose automatically or platform-specific
-    follow_symlinks: bool = False
-
-@export
-@dataclass
-class Plugins:
-    """Plugin enablement and configuration.
-
-    These help Nuitka handle special libraries that need custom treatment.
-        (e.g., tk-inter, multiprocessing, numpy, etc.)
+class PythonControls:
+    #=================================================#
+    # se debug version or not. 
+    # Default uses what you are using to run Nuitka, most 
+    #   likely a non-debug version.
+    # Only for debugging and testing purposes.
+    #=================================================#
+    debug_build: bool | None = field(
+        default=None,
+        metadata={
+            "serializer": bool_flag_serializer("python-debug")
+        }
+    )
     
-    You must manually enable some plugins, or your app may break 
-    For instance, tkinter GUIs won't launch properly without tk-inter plugin).
-    """
+    #=================================================# 
+    # Python flags to use. 
+    # Default is what you are using to run Nuitka, this enforces a specific mode. 
+    # These are options that also exist to standard Python executable.
+    # Currently supported: 
+    #   "-S" (alias "no_site"), 
+    #   "static_hashes" (do not use hash randomization), 
+    #   "no_warnings" (do not give Python run time warnings),
+    #   "-O" (alias "no_asserts"), 
+    #   "no_docstrings" (do not use doc strings), 
+    #   "-u" (alias "unbuffered"), 
+    #   "isolated" (do not load outside code), 
+    #   "-P" (alias "safe_path", do not used current directory in module search)
+    #   "-m" (package mode, compile as "package.__main__")
+    # Default empty.
     #=================================================#
-    # List of built-in Nuitka plugins.
-    #=================================================#
-    enabled: list[str] = field(default_factory=list)
-    
-    #=================================================#
-    # Paths to custom plugin scripts (.py files) written by you.
-    # 
-    # These can:
-    #   - Include additional files,
-    #   - Hook into the compilation process,
-    #   - Modify behavior of modules,
-    #   - Patch compatibility issues.
-    #=================================================#
-    user_plugins: list[Path] = field(default_factory=list)
-    
-    #=================================================#
-    # By default, Nuitka tries to detect needed plugins automatically 
-    #   (based on your imports); this disables that.
-    #
-    # Use when you want full manual control and avoid accidental plugin inclusion.
-    #=================================================#
-    disable_auto_detection: bool = False
-    
-    #=================================================#
-    # Logs detailed information about plugin activity during compilation.
-    #
-    # Use when debugging plugin behavior or figuring out what’s going wrong with packaging.
-    #=================================================#
-    trace_plugins: bool = False
+    py_flags: list[PyFlag | str] = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("python-flag")
+        }
+    )
+#!SECTION    
 
+#SECTION Package/Module Inclusion and Exclusion
 @export
 @dataclass
 class Packages:
-    """Manual module/package inclusion/exclusion.
-    """
     #=================================================#
-    # Force Nuitka to include specific packages or modules even if it didn't detect them via import scanning.
-    # 
-    # Needed for:
-    #   - Dynamic imports (__import__, importlib),
-    #   - Conditional imports,
-    #   - Plugins that Nuitka doesn't fully scan.
+    # Include a whole package.
+    # Give as a Python namespace, e.g. "some_package.sub_package" 
+    #   and Nuitka will then find it and include it and all the 
+    #   modules found below that disk location in the binary 
+    #   or extension module it creates, and make it available 
+    #   for import by the code. 
+    # To avoid unwanted sub packages, e.g. test, you can do this:
+    #   "--nofollow-import-to=*.tests"
+    # Default empty.
     #=================================================#
-    include: list[str] = field(default_factory=list)
+    include_packages: list[str] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("include-package")
+        }
+    )
     
     #=================================================#
-    # Exclude specific modules/packages even if Nuitka thinks they’re needed.
-    #
-    # Use to shrink binary size or avoid bundling dev/test-only code.
+    # Include a single module. 
+    # Give as a Python namespace,  e.g. "some_package.some_module" 
+    #   and Nuitka will then find it and include it in the 
+    #   binary or extension module it creates, and make it available 
+    #   for import by the code. 
+    # Default empty.
     #=================================================#
-    exclude: list[str] = field(default_factory=list)
-    
-    #=================================================#
-    # Tells Nuitka to not follow any imports unless you manually include them.
-    #
-    # Use when you want complete manual control (advanced use only).
-    # [!!!] Without include, your app probably won’t work if you enable this.
-    #=================================================#
-    nofollow_imports: bool = False
-    
-    #=================================================#
-    # Tells Nuitka to ignore imports to specific modules 
-    #   (like test frameworks or large unused submodules).
-    # 
-    # Use this to cut out bloat (e.g., excluding matplotlib.tests or scipy.whatever).
-    #=================================================#
-    nofollow_to: list[str] = field(default_factory=list)
+    include_modules: list[str] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("include-module")
+        }
+    )
+#!SECTION
 
+#SECTION OneFile Options
 @export
 @dataclass
-class Data:
-    """Embedding data files and directories.
-    """
-    include_files: list[Path] = field(default_factory=list)
-    include_dirs: list[Path] = field(default_factory=list)
+class OneFileControl:
+    #=================================================#
+    # Use this as a folder to unpack to in onefile mode.
+    # Defaults to '{TEMP}/onefile_{PID}_{TIME}', 
+    #   i.e. user temporary directory and being non-static it's removed.
+    # Use e.g. a string like '{CACHE_DIR}/{COMPANY}/{PRODUCT}/{VERSION}'
+    #   which is a good static cache path, this will then not be removed.
+    #=================================================#
+    temp_dir: str | None = field(
+        default=None,
+        metadata={
+            "cli": "onefile-tempdir-spec"
+        }
+    )
     
+    #=================================================#
+    # This mode is inferred from your use of the spec. 
+    # If it contains runtime dependent paths, "auto" resolves to 
+    #   "temporary" which will make sure to remove the unpacked binaries 
+    #   after execution, and cached will not remove it and see to 
+    #   reuse its contents during next execution for faster startup times.
+    #=================================================#
+    cached_dir: str | None = field(
+        default=None,
+        metadata={
+            "cli": "onefile-cache-mode"
+        }
+    )
+    
+    #=================================================#
+    # When stopping the child, e.g. due to CTRL-C or shutdown or likewise
+    #   the Python code gets a "KeyboardInterrupt", that it may handle to 
+    #   for example, flush data. 
+    # This is the amount of time in ms, before the child is killed in the hard way.
+    # Unit is ms, and default 5000.
+    #=================================================#
+    grace_time_ms: int = field(
+        default=5000,
+        metadata={
+            "cli": "onefile-child-grace-time"
+        }
+    )
+    
+    #=================================================# 
+    # When creating the onefile, disable compression of the payload. 
+    # This is mostly for debug purposes, or to save time. 
+    # Default is off.
+    #=================================================#
+    no_compression: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("onefile-no-compression")
+        }
+    )
+    
+    #=================================================#
+    # When creating the onefile, use an archive format, 
+    #   that can be unpacked with "nuitka-onefile-unpack" rather than 
+    #   a stream that only the onefile program itself unpacks. 
+    # Default is off.
+    #=================================================#
+    as_archive: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("onefile-as-archive")
+        }
+    )
+    
+    #=================================================#
+    # When creating the onefile, some platforms 
+    #   (Windows currently, if not using a cached location) default to 
+    #   using DLL rather than an executable for the Python code. 
+    # This makes it use an executable in the unpacked files as well. 
+    # Default is off.
+    #=================================================#
+    no_dll: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("onefile-no-dll")
+        }
+    )
+#!SECTION
+    
+    
+#SECTION Data Files
+@export
+@dataclass
+class DataFiles:
+    #=================================================#
+    # Include data files for the given package name. 
+    # DLLs and extension modules are not data files and 
+    #   never included like this. 
+    # Can use patterns the filenames as indicated below. 
+    # Data files of packages are not included by default, but 
+    #   package configuration can do it. 
+    # This will only include non-DLL, non-extension modules, 
+    #   i.e. actual data files. 
+    # After a ":" optionally a filename pattern can be given as well,
+    #   selecting only matching files. 
+    # Examples: 
+    #   "--include-package-data=package_name" (all files) 
+    #   "--include-package-data=package_name:*.txt" (only certain type) 
+    #   "--include-package-data=package_name:some_filename.dat(concrete file) 
+    # Default empty.
+    #=================================================#
+    include_package_data: list[Path] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("include-package-data")
+        }
+    )
+    
+    #=================================================#
+    # Include data files by filenames in the distribution.
+    # There are many allowed forms. 
+    # With '--include-data- files=/path/to/file/*.txt=folder_name/some.txt' 
+    #   it will copy a single file and complain if it's multiple.
+    # With '--include-data-files=/path/to/files/*.txt=folder_name/' 
+    #   it will put all matching files into that folder. 
+    # For recursive copy there is a form with 3 values that 
+    #   '--include-data-files=/path/to/scan=folder_name/=**/*.txt' 
+    # that will preserve directory structure. 
+    # Default empty.
+    #=================================================#
+    include_data_files: list[Path] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("include-data-files")
+        }
+    )
+    
+    #=================================================#
+    # Include data files from complete directory in the distribution. 
+    # This is recursive. 
+    # Check '--include-data-files' with patterns if you want non-recursive inclusion. 
+    # An example would be '--include-data-dir=/path/some_dir=data/some_dir' 
+    #   for plain copy, of the whole directory. All non-code files are copied, if 
+    #       you want to use '--noinclude-data-files' option to remove them. 
+    # Default empty.
+    #=================================================#
+    include_data_dirs: list[Path] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("include-data-dir")
+        }
+    )
+    
+    #=================================================#
+    # Do not include data files matching the filename pattern given. 
+    # This is against the target filename, not source paths. 
+    # So to ignore a file pattern from package data for 'package_name' 
+    #   should be matched as 'package_name/*.txt'. Or for the whole directory 
+    #   simply use 'package_name'.
+    # Default empty.
+    #=================================================#
+    no_include_data_files: list[Path] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("noinclude-data-files")
+        }
+    )
+    
+    #=================================================#
+    # Include the specified data file patterns outside of the 
+    #   onefile binary, rather than on the inside. 
+    # Makes only sense in case of '--onefile' compilation. 
+    # First files have to be specified as included with other 
+    #   `--include-*data*` options, and then this refers to 
+    # target paths inside the distribution. 
+    # Default empty.
+    #=================================================#
+    include_onefile_external_data: list[Path] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("include-onefile-external-data")
+        }
+    )
+#!SECTION
+
+#SECTION DLL Files
+@export
+@dataclass
+class DLLFileControl:
+    #=================================================#
+    # Do not include DLL files matching the filename pattern given. 
+    # This is against the target filename, not source paths. 
+    # So ignore a DLL 'someDLL' contained in the package 'package_name' 
+    #   it should be matched as 'package_name/someDLL.*'. 
+    # Default empty.
+    #=================================================#
+    noinclude_dlls: list[str] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("noinclude-dlls")
+        }
+    )
+#!SECTION
+
+#SECTION Nuitka Warnings Control
+@export
+@dataclass
+class NuitkaWarningControl:
+    #=================================================#
+    # Enable warnings for implicit exceptions detected at compile time.
+    #=================================================#
+    warn_implicit_exceptions: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("warn-implicit-exceptions")
+        }
+    )
+    
+    #=================================================#
+    # Enable warnings for unusual code detected at compile time.
+    #=================================================#
+    warn_unusual_code: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("warn-unusual-code")
+        }
+    )
+    
+    #=================================================#
+    # Allow Nuitka, on Windows, to download external code if necessary such as:
+    #   - dependency walker, 
+    #   - ccache, 
+    #   - and even gcc. 
+    # To disable, redirect input from nul device, 
+    #   e.g. "</dev/null" or "<NUL:". 
+    # Default is to prompt (FALSE).
+    #=================================================#
+    assume_yes_for_downloads: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("assume-yes-for-downloads")
+        }
+    )
+#!SECTION
+
+#SECTION Post-Compilation
+@export
+@dataclass
+class PostCompilation:
+    #=================================================#
+    # Execute immediately the created binary (or import the compiled module). 
+    # Defaults to off.
+    #=================================================#
+    run: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("run")
+        }
+    )
+    
+    #=================================================#
+    # Execute inside a debugger, e.g. "gdb" or "lldb" to 
+    #   automatically get a stack trace. 
+    # The debugger is automatically chosen unless specified by 
+    #   name with the NUITKA_DEBUGGER_CHOICE environment variable. 
+    # Defaults to off.
+    #=================================================#
+    debugger: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("debugger")
+        }
+    )
+    
+#!SECTION
+
+#SECTION Output Choices
+@export
+@dataclass
+class OutputChoices:
+    #=================================================#
+    # Specify how the executable should be named. 
+    # For extension modules there is no choice, also not for 
+    #   standalone mode and using it will be an error. 
+    # This may include path information that needs to exist though. 
+    # Defaults to '<program_name>.exe' on this platform.
+    #=================================================#
+    file_name: str | None = field(
+        default=None,
+        metadata={
+            "cli": "output-filename"
+        }
+    )
+    
+    #=================================================#
+    # Specify where intermediate and final output files should be put. 
+    # The DIRECTORY will be populated with 
+    #   - build folder, 
+    #   - dist folder, 
+    #   - binaries, 
+    #   - etc. 
+    # Defaults to current directory.
+    #=================================================#
+    output_dir: Path | None = field(
+        default=None,
+        metadata={
+            "cli": "output-dir"
+        }
+    )
+    
+    #=================================================#
+    # Removes the build directory after producing the module or exe file. 
+    # Defaults to off.
+    #=================================================#
+    remove_output: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("remove-output")
+        }
+    )
+    
+    #=================================================#
+    # Do not create a '.pyi' file for extension modules created by Nuitka. 
+    # This is used to detect implicit imports. 
+    # Defaults to off.
+    #=================================================#
+    no_pyi_file: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("no-pyi-file")
+        }
+    )
+    
+    #=================================================#
+    # Do not use stubgen when creating a '.pyi' file for extension 
+    #   modules created by Nuitka. 
+    # They expose your API, but stubgen may cause issues. 
+    # Defaults to off.
+    #=================================================#
+    no_pyi_stubs: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("no-pyi-stubs")
+        }
+    )
+#!SECTION
+
+#SECTION Deployment Control
+@export
+@dataclass
+class DeploymentControl:
+    #=================================================#
+    # Disable code aimed at making finding compatibility issues easier. 
+    # This will for e.g. prevent execution with "-c" argument, 
+    #   which is often used by code that attempts run a module, 
+    #   and causes a program to start itself over and over potentially.
+    # Disable once you deploy to end users, for finding typical issues, this
+    #   is very helpful during development. 
+    # Default off.
+    #=================================================#
+    deployment: str | None = field(
+        default=None,
+        metadata={
+            "cli": "deployment"
+        }
+    )
+    
+    #TODO NoDeploymentFlag
+    no_deployment_flag = None
+#!SECTION
+
+#SECTION Environment Control
+@export
+@dataclass
+class EnvControl:
+    #=================================================#
+    # Force an environment variables to a given value.
+    # Default empty.
+    #=================================================#
+    force_envs: list[str] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("force-runtime-environment-variable")
+        }
+    )
+#!SECTION
+
+#SECTION Debug Features
 @export
 @dataclass
 class Debug:
     """Debug symbols and runtime tracing.
     """
-    debug_symbols: bool = True
-    unstripped: bool = True
-    trace_execution: bool = False
-    show_memory: bool = False
-    show_modules: bool = True
+    #=================================================#
+    # Executing all self checks possible to find errors in Nuitka.
+    # Do not use for production. 
+    # Defaults to off.
+    #=================================================#
+    debug: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("debug")
+        }
+    )
+    
+    #=================================================#
+    # Disable check normally done with "--debug". 
+    # The C compilation may produce warnings, which it often does 
+    #   for some packages without these being issues, esp. for unused values.
+    #=================================================#
+    disable_c_warnings: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("no-debug-c-warnings")
+        }
+    )
+    
+    #=================================================#
+    # Keep debug info in the resulting object file for better 
+    #   debugger interaction. 
+    # Defaults to off.
+    #=================================================#
+    unstripped: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("unstripped")
+        }
+    )
+    
+    #=================================================#
+    # Traced execution output, output the line of code 
+    #   before executing it. 
+    # Defaults to off.
+    #=================================================#
+    trace_execution: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("trace-execution")
+        }
+    )
+    
+    #=================================================#
+    # Write the internal program structure, result of 
+    #   optimization in XML form to given filename.
+    #=================================================#
+    xml: Path | None = field(
+        default=None,
+        metadata={
+            "cli": "xml"
+        }
+    )
+    
+    #=================================================#
+    # Attempt to use less memory, by forking less C compilation 
+    #   jobs and using options that use less memory. 
+    # For use on embedded machines. 
+    # Use this in case of out of memory problems.
+    # Defaults to off.
+    #=================================================#
+    low_memory: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("low-memory")
+        }
+    )
+#!SECTION
+
+#SECTION CacheControl
+@export
+class CacheChoice(StrEnum):
+    all = "all"
+    ccache = "ccache"
+    bytecode = "bytecode"
+    compression = "compression"
+    dll_dependencies = "dll-dependencies"
 
 @export
 @dataclass
-class Logging:
-    """Console verbosity and diagnostics.
-    """
-    verbose: bool = False
-    quiet: bool = False
+class CacheControl:
+    #=================================================#
+    # Disable selected caches, specify "all" for all cached.
+    # Default none.
+    #=================================================#
+    disable_caches: list[CacheChoice | str] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("disable-cache")
+        }
+    )
+    
+    #=================================================#
+    # Clean the given caches before executing, specify "all" for all cached.
+    # Default none.
+    #=================================================#
+    clean_cache: list[CacheChoice | str] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("clean-cache")
+        }
+    )
+#!SECTION
+
+#SECTION Tracing/Logging
+@export
+@dataclass
+class TracingFeatures:
+    #=================================================#
+    # Report module, data files, compilation, plugin, etc
+    #   details in an XML output file. 
+    # This is also super useful for issue reporting. 
+    # These reports can be used to re-create the environment 
+    #   easily using it with '--create-environment-from-report', 
+    #   but contain a lot of information. 
+    # Default is off.
+    #=================================================#
+    report_filename: str | None = field(
+        default=None,
+        metadata={
+            "cli": "report"
+        }
+    )
+    
+    #=================================================#
+    # Report data in diffable form, i.e. no timing or memory 
+    #   usage values that vary from run to run. 
+    # Default is off.
+    #=================================================#
+    report_diffable: str | None = field(
+        default=None,
+        metadata={
+            "cli": "report-diffable"
+        }
+    )
+    
+    # TODO - ReportUserProvided
+    report_user_provided = None
+    
+    # TODO - ReportTemplate
+    report_template = None
+    
+    #=================================================#
+    # Disable all information outputs, but show warnings.
+    # Defaults to off.
+    #=================================================#
+    quiet: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("quiet")
+        }
+    )
+    
+    #=================================================#
+    # Run the C building backend Scons with verbose information, 
+    #   showing the executed commands, detected compilers. 
+    # Defaults to off.
+    #=================================================#
+    show_scons: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("show-scons")
+        }
+    )
+    
+    #=================================================#
+    # Disable progress bars. 
+    # Defaults to off.
+    #=================================================#
+    no_progressbar: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("no-progressbar")
+        }
+    )
+    
+    #=================================================#
+    # Provide memory information and statistics. 
+    # Defaults to off.
+    #=================================================#
+    show_memory: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("show-memory")
+        }
+    )
+    
+    #=================================================#
+    # Where to output '--report', should be a filename. 
+    # Default is standard output.
+    #=================================================#
+    show_modules_output: Path | None = field(
+        default=None,
+        metadata={
+            "cli": "show-modules-output"
+        }
+    )
+    
+    #=================================================# 
+    # Output details of actions taken, esp. in optimizations. 
+    # Can become a lot. 
+    # Defaults to off.
+    #=================================================#
+    verbose: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("verbose")
+        }
+    )
+    
+    #=================================================# 
+    # Where to output from '--verbose', should be a filename. 
+    # Default is standard output.
+    #=================================================#
+    verbose_output: Path | None = field(
+        default=None,
+        metadata={
+            "cli": "verbose-output"
+        }
+    )
+#!SECTION
 
 #SECTION OS Controls
 #SECTION WindowsOSControls
@@ -238,44 +736,78 @@ class WindowsConsoleMode(StrEnum):
 @dataclass
 class WindowsOSControl:
     # Select console mode to use. Default mode is 'force'.
-    console_mode: bool = WindowsConsoleMode.force
+    console_mode: WindowsConsoleMode = field(
+        default=WindowsConsoleMode.force,
+        metadata={
+            "serializer": enum_serializer("windows-console-mode")
+        }
+    )
     
     # Add executable icon. Can be given multiple times for different 
     #   resolutions or files with multiple icons inside.
-    icon_from_ico: Path | None = None
+    icon_from_ico: Path | None = field(
+        default=None,
+        metadata={
+            "cli": "windows-icon-from-ico"
+        }
+    )
     
     # Copy executable icons from this existing executable (Windows only).
-    icon_from_exe: Path | None = None
+    icon_from_exe: Path | None = field(
+        default=None,
+        metadata={
+            "cli": "windows-icon-from-exe"
+        }
+    )
     
     # When compiling for Windows and onefile, show this
     #   while loading the application. Defaults to off.
-    slash_screen: str = ""
+    slash_screen: str | None = field(
+        default=None,
+        metadata={
+            "cli": "onefile-windows-splash-screen"
+        }
+    )
     
     # Request Windows User Control, to grant admin rights on
     #   execution. (Windows only). Defaults to off.
-    uac_admin: bool = False
+    uac_admin: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("windows-uac-admin")
+        }
+    )
     
     # Request Windows User Control, to enforce running from 
     #   a few folders only, remote desktop access. 
     #   (Windows only). Defaults to off.
-    uac_uiaccess: bool = False
+    uac_uiaccess: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("windows-uac-uiaccess")
+        }
+    )
 #!SECTION
 
 #SECTION MacOSControls
+@export
 class MacArchTarget(StrEnum):
     limit = "limit"
     native = "native"
 
+@export
 class MacAppMode(StrEnum):
     gui = "gui"
     ui_element = "ui-element"
     background = "background"
 
+@export
 class MacMultipleInstance(StrEnum):
     off = "off"
     prevent = "LSMultipleInstancesProhibited"
 
 @export
+@dataclass
 class MacOSControls:
     #=================================================#
     #When compiling for macOS, create a bundle rather than
@@ -284,21 +816,36 @@ class MacOSControls:
     #   get high DPI graphics, etc. and implies standalone mode. 
     # Defaults to off.
     #=================================================#
-    create_app_bundle: bool = False
+    create_app_bundle: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("macos-create-app-bundle")
+        }
+    )
     
     #=================================================#
     # What architectures is this to supposed to run on.
     # Default and limit is what the running Python allows for. 
     # Default is "native" which is the architecture the Python is run with.
     #=================================================#
-    target_arch: MacArchTarget = MacArchTarget.native
+    target_arch: MacArchTarget = field(
+        default=MacArchTarget.native,
+        metadata={
+            "serializer": enum_serializer("macos-target-arch")
+        }
+    )
     
     #=================================================#
     # Add icon for the application bundle to use. 
     # Can be given only one time. 
     # Defaults to Python icon if available.
     #=================================================#
-    app_icon: Path | None = None
+    app_icon: Path | None = field(
+        default=None,
+        metadata={
+            "cli": "macos-app-icon"
+        }
+    )
     
     #=================================================#
     # Name of the application to use for macOS signing.
@@ -306,13 +853,23 @@ class MacOSControls:
     #   best results, as these have to be globally unique,
     #   and will potentially grant protected API accesses.
     #=================================================#
-    signed_app_name: str | None = None
+    signed_app_name: str | None = field(
+        default=None,
+        metadata={
+            "cli": "macos-signed-app-name"
+        }
+    )
     
     #=================================================#
     # Name of the product to use in macOS bundle information. 
     # Defaults to base filename of the binary.
     #=================================================#
-    app_name: str | None = None
+    app_name: str | None = field(
+        default=None,
+        metadata={
+            "cli": "macos-app-name"
+        }
+    )
     
     #=================================================#
     # Mode of application for the application bundle. 
@@ -323,40 +880,60 @@ class MacOSControls:
     # The application will not appear in dock, but get full access to
     #   desktop when it does open a Window later.
     #=================================================#
-    app_mode: MacAppMode = MacAppMode.gui
+    app_mode: MacAppMode = field(
+        default=MacAppMode.gui,
+        metadata={
+            "serializer": enum_serializer("macos-app-mode")
+        }
+    )
     
     #=================================================#
     # For application bundles, set the flag "LSMultipleInstancesProhibited" 
     #   to prevent launching multiple instances of the application. 
     # Default is off.
     #=================================================#
-    prohibit_multiple_instance: MacMultipleInstance = MacMultipleInstance.off
+    prohibit_multiple_instance: MacMultipleInstance | None = field(
+        default=None,
+        metadata={
+            "serializer": enum_serializer("macos-prohibit-multiple-instances")
+        }
+    )
     
     #TODO - MacSignIdentity
-    sign_identity = field(default_factory=NotImplementedError)
+    sign_identity = None
     
     #TODO - MacSignNotarization
-    sign_notarization = field(default_factory=NotImplementedError)
+    sign_notarization = None
     
     #=================================================#
     # Product version to use in macOS bundle information.
     # Defaults to "1.0" if not given.
     #=================================================#
-    app_version: str = "1.0"
+    app_version: str | None = field(
+        default=None,
+        metadata={
+            "cli": "macos-app-version"
+        }
+    )
     
     #TODO - MacProtectedResource
     # https://developer.apple.com/documentation/bundleresources/information_property_list/protected_resources
-    protected_resource = field(default_factory=NotImplementedError)
+    protected_resource = None
 #!SECTION
 
 #SECTION LinuxOSControls
 @export
 @dataclass
 class LinuxOSControls:
-    icon_path: Path | None = None
+    icon_path: Path | None = field(
+        default=None,
+        metadata={
+            "cli": "linux-icon"
+        }
+    )
 #!SECTION
 
-#SECTION Controls Dataclass
+#SECTION OS Controls Dataclass
 @export
 @dataclass
 class OSControls:
@@ -369,7 +946,12 @@ class OSControls:
     #   use e.g. '{PROGRAM_BASE}.out.txt', i.e. file near your program.
     # Check User Manual for full list of available values.
     #=================================================#
-    force_stdout: str | None = None
+    force_stdout: str | None = field(
+        default=None,
+        metadata={
+            "cli": "force-stdout-spec"
+        }
+    )
     
     #=================================================#
     #STUB - Ambiguous
@@ -380,7 +962,12 @@ class OSControls:
     #   use e.g. '{PROGRAM_BASE}.err.txt', i.e. file near your program.
     # Check User Manual for full list of available values.
     #=================================================#
-    force_stderr: str | None = None
+    force_stderr: str | None = field(
+        default=None,
+        metadata={
+            "cli": "force-stderr-spec"
+        }
+    )
     
     #=================================================#
     # Created as a proxy for this config builder.
@@ -407,13 +994,23 @@ class BinaryVersionInfo:
     # Name of the company to use in version information.
     # Defaults to unused.
     #=================================================#
-    company_name: str | None = None
+    company_name: str | None = field(
+        default=None,
+        metadata={
+            "cli": "company-name"
+        }
+    )
     
     #=================================================#
     # Name of the product to use in version information.
     # Defaults to base filename of the binary.
     #=================================================#
-    product_name: str | None = None
+    product_name: str | None = field(
+        default=None,
+        metadata={
+            "cli": "product-name"
+        }
+    )
     
     #=================================================#
     # File version to use in version information. 
@@ -421,49 +1018,112 @@ class BinaryVersionInfo:
     #   no more digits are allowed, no strings are allowed.
     # Defaults to unused.
     #=================================================#
-    file_version: str | None = None
+    file_version: str | None = field(
+        default=None,
+        metadata={
+            "cli": "file-version"
+        }
+    )
     
     #=================================================#
     # Product version to use in version information. 
     # Same rules as for file version. Defaults to unused.
     #=================================================#
-    product_version: str | None = None
+    product_version: str | None = field(
+        default=None,
+        metadata={
+            "cli": "product-version"
+        }
+    )
     
     #=================================================#
     # Description of the file used in version information.
     # Windows only at this time. 
     # Defaults to binary filename.
     #=================================================#
-    file_description: str | None = None
+    file_description: str | None = field(
+        default=None,
+        metadata={
+            "cli": "file-description"
+        }
+    )
     
     #=================================================# 
     # Copyright used in version information. 
     # Windows/macOS only at this time. 
     # Defaults to not present.
     #=================================================#
-    copyright_text: str | None = None
+    copyright_text: str | None = field(
+        default=None,
+        metadata={
+            "cli": "copyright"
+        }
+    )
     
     #=================================================#
     # Trademark used in version information. 
     # Windows/macOS only at this time. 
     # Defaults to not present.
     #=================================================#
-    trademark_text: str | None = None
+    trademark_text: str | None = field(
+        default=None,
+        metadata={
+            "cli": "trademarks"
+        }
+    )
 #!SECTION
 
 #SECTION Full Config DataClass
+  
+@export
+class BuildMode(StrEnum):
+    #=================================================#
+    # Creates a directory (dist/your_app/) containing:
+    #   - Your app executable
+    #   - All dependencies (Python DLL, packages, plugins, etc.)
+    #   - Portable — but still a folder of files.
+    #
+    # Use this when you want a fully self-contained app that doesn't rely 
+    #   on a system Python install.
+    #=================================================#
+    standalone = "standalone"
+    
+    #=================================================#
+    # Builds on standalone, but compresses everything into a single .exe or binary.
+    # - At runtime, it unpacks the contents into a temporary 
+    #       directory and runs it from there.
+    # - Slightly slower startup, but more portable.
+    #
+    # Use when you want a single-file app for easier distribution.
+    # Implicitly sets standalone = true.
+    #=================================================#
+    onefile = "onefile"
+    
+    module = "module"
+    
+    default = "accelerated"
+    
+    dll = "NotImplementedError"
+    
 @export
 @dataclass
 class NuitkaConfig:
-    core: Core = field(default_factory=Core) 
-    output: Output = field(default_factory=Output)
-    optimization: Optimization = field(default_factory=Optimization)
-    parallel: Parallel = field(default_factory=Parallel)
-    python: Python = field(default_factory=Python)
-    compiler: Compiler = field(default_factory=Compiler)
-    plugins: Plugins = field(default_factory=Plugins)
+    build_mode: BuildMode = field(
+        default=BuildMode.default
+    )
+    one_file_options: OneFileControl | None = None
+    datas: DataFiles = field(default_factory=DataFiles)
+    dlls: DLLFileControl = field(default_factory=DLLFileControl)
     packages: Packages = field(default_factory=Packages)
-    data: Data = field(default_factory=Data)
+    python: PythonControls = field(default_factory=PythonControls)
+    post_compile: PostCompilation = field(default_factory=PostCompilation)
+    os: OSControls = field(default_factory=OSControls)
+    binary_versioning: BinaryVersionInfo = field(default_factory=BinaryVersionInfo)
+    output: OutputChoices = field(default_factory=OutputChoices)
+    deployment: DeploymentControl = field(default_factory=DeploymentControl)
+    env: EnvControl = field(default_factory=EnvControl)
     debug: Debug = field(default_factory=Debug)
-    logging: Logging = field(default_factory=Logging)
+    caching: CacheControl = field(default_factory=CacheControl)
+    tracing: TracingFeatures = field(default_factory=TracingFeatures)
+    nuk_warns: NuitkaWarningControl = field(default_factory=NuitkaWarningControl)
 #!SECTION
