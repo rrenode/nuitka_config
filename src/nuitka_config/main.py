@@ -40,7 +40,7 @@ def convert_config_to_args(config) -> list[str]:
 def parse_args(args):
     """Parse CLI arguments."""
     from nuitka_config import __version__
-    parser = argparse.ArgumentParser(description="Nuitka CLI build runner")
+    parser = argparse.ArgumentParser(description="Nuitka CLI build runner", allow_abbrev=False)
     parser.add_argument("--version", action="version", version=f"nuitka_config {__version__}")
     parser.add_argument("--spec", type=Path, help="Path to .spec.py file defining a NuitkaConfig object")
     parser.add_argument("--dry-run", action="store_true", help="Only print the command to be run")
@@ -51,7 +51,7 @@ def parse_args(args):
     parser.add_argument(
         "-vv", "--very-verbose", dest="loglevel", help="Set loglevel to DEBUG", action="store_const", const=logging.DEBUG
     )
-    return parser.parse_args(args)
+    return parser.parse_known_args(args)
 
 
 def setup_logging(loglevel: int):
@@ -66,22 +66,27 @@ def setup_logging(loglevel: int):
 
 
 def main(args):
-    """Main entry point for CLI logic."""
-    from .builder import load_spec_file
-    args = parse_args(args)
-    setup_logging(args.loglevel)
+    from nuitka_config.builder import load_spec_file
+    parsed_args, passthrough_args = parse_args(args)
+    setup_logging(parsed_args.loglevel)
 
-    if args.spec:
-        _logger.info(f"Loading config from {args.spec}")
-        config = load_spec_file(args.spec)
+    if parsed_args.spec:
+        _logger.info(f"Loading config from {parsed_args.spec}")
+        config = load_spec_file(parsed_args.spec)
         cli_args = convert_config_to_args(config)
+    elif passthrough_args:
+        cli_args = passthrough_args + [" <--- (Plus Nuitka's defaults)"]
     else:
-        cli_args = sys.argv[1:]  # fallback to raw passthrough
+        # No --spec and no args: use default config
+        _logger.info("No spec or args provided — using default NuitkaConfig()")
+        from nuitka_config.models import NuitkaConfig
+        config = NuitkaConfig()
+        cli_args = convert_config_to_args(config)
 
-    full_command = args.nuitka.split() + cli_args
+    full_command = parsed_args.nuitka.split() + cli_args
     _logger.debug("Resolved command: %s", full_command)
 
-    if args.dry_run:
+    if parsed_args.dry_run:
         print("Dry run. Would run:")
         print(" ".join(full_command))
     else:
