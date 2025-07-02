@@ -25,8 +25,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from nuitka_config import __version__
-
 __author__ = "rrenode"
 __copyright__ = "rrenode"
 __license__ = "MIT"
@@ -41,6 +39,7 @@ def convert_config_to_args(config) -> list[str]:
 
 def parse_args(args):
     """Parse CLI arguments."""
+    from nuitka_config import __version__
     parser = argparse.ArgumentParser(description="Nuitka CLI build runner")
     parser.add_argument("--version", action="version", version=f"nuitka_config {__version__}")
     parser.add_argument("--spec", type=Path, help="Path to .spec.py file defining a NuitkaConfig object")

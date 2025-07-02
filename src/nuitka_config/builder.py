@@ -3,7 +3,7 @@ import importlib.util
 from pathlib import Path
 from typing import List
 
-from models import *
+from .models import *
 
 def convert_to_nuitka_args(config: NuitkaConfig) -> List[str]:
     args = []

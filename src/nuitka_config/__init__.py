@@ -26,7 +26,7 @@ else:
     from importlib_metadata import version, PackageNotFoundError  # pragma: no cover
 
 try:
-    __version__ = version(nuitka-config)
+    __version__ = version("nuitka-config")
 except PackageNotFoundError:  # pragma: no cover
     __version__ = unknown
 finally:
