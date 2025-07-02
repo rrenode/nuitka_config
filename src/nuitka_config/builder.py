@@ -32,7 +32,7 @@ def convert_to_nuitka_args(config: NuitkaConfig) -> List[str]:
         args.append("--lto=yes")
     else:
         args.append("--lto=no")
-    if config.optimization.enable_assets:
+    if config.optimization.enable_asserts:
         args.append("--enable-asserts")
     if config.optimization.nooptimize:
         args.append("--nooptimize")
