@@ -33,7 +33,7 @@ def convert_to_nuitka_args(config: NuitkaConfig) -> List[str]:
     else:
         args.append("--lto=no")
     if config.optimization.enable_asserts:
-        args.append("--enable-asserts")
+        args.append("--python-flag=no_asserts")
     if config.optimization.nooptimize:
         args.append("--nooptimize")
     if config.optimization.prefer_source_code:
@@ -70,7 +70,7 @@ def convert_to_nuitka_args(config: NuitkaConfig) -> List[str]:
     for inc in config.packages.include:
         args.append(f"--include-package={inc}")
     for exc in config.packages.exclude:
-        args.append(f"--exclude-module={exc}")
+        args.append(f"--nofollow-import-to={exc}")
     if config.packages.nofollow_imports:
         args.append("--nofollow-imports")
     for nf in config.packages.nofollow_to:
