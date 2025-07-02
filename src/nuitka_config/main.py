@@ -44,6 +44,11 @@ def parse_args(args):
     parser.add_argument("--version", action="version", version=f"nuitka_config {__version__}")
     parser.add_argument("--spec", type=Path, help="Path to .spec.py file defining a NuitkaConfig object")
     parser.add_argument("--dry-run", action="store_true", help="Only print the command to be run")
+    parser.add_argument(
+        "--export-bat",
+        type=Path,
+        help="Write the resolved Nuitka command to a Windows .bat file"
+    )
     parser.add_argument("--nuitka", default="nuitka", help="Override the Nuitka binary (e.g., 'python -m nuitka')")
     parser.add_argument(
         "-v", "--verbose", dest="loglevel", help="Set loglevel to INFO", action="store_const", const=logging.INFO
@@ -86,7 +91,23 @@ def main(args):
     full_command = parsed_args.nuitka.split() + cli_args
     _logger.debug("Resolved command: %s", full_command)
 
-    if parsed_args.dry_run:
+    if parsed_args.export_bat:
+        bat_path = parsed_args.export_bat
+        with bat_path.open("w", encoding="utf-8") as f:
+            f.write("@echo off\n")
+            f.write("REM Generated Nuitka build script\n\n")
+            f.write("setlocal\n\n")
+            f.write("REM Run Nuitka with arguments\n")
+            f.write(parsed_args.nuitka)
+            
+            # Write each argument on a new indented line with caret `^` line continuation
+            for arg in cli_args:
+                f.write(f" ^\n    {arg}")
+
+            f.write("\n\nendlocal\n")
+
+        _logger.info(f"Wrote build script to {bat_path}")
+    elif parsed_args.dry_run:
         print("Dry run. Would run:")
         print(" ".join(full_command))
     else:
