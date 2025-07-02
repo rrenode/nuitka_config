@@ -217,6 +217,8 @@ class Logging:
     verbose: bool = False
     quiet: bool = False
 
+#SECTION OS Controls
+#SECTION WindowsOSControls
 @export
 class WindowsConsoleMode(StrEnum):
     # creates a console window unless the program was started from one.
@@ -257,7 +259,9 @@ class WindowsOSControl:
     #   a few folders only, remote desktop access. 
     #   (Windows only). Defaults to off.
     uac_uiaccess: bool = False
+#!SECTION
 
+#SECTION MacOSControls
 class MacArchTarget(StrEnum):
     limit = "limit"
     native = "native"
@@ -343,12 +347,16 @@ class MacOSControls:
     #TODO - MacProtectedResource
     # https://developer.apple.com/documentation/bundleresources/information_property_list/protected_resources
     protected_resource = field(default_factory=NotImplementedError)
+#!SECTION
 
+#SECTION LinuxOSControls
 @export
 @dataclass
 class LinuxOSControls:
     icon_path: Path | None = None
+#!SECTION
 
+#SECTION Controls Dataclass
 @export
 @dataclass
 class OSControls:
@@ -388,7 +396,10 @@ class OSControls:
                     linux_option=LinuxOSControls
                 )()
             )
+#!SECTION
+#!SECTION
 
+#SECTION BinaryVersionInfo
 @export
 @dataclass
 class BinaryVersionInfo:
@@ -438,7 +449,9 @@ class BinaryVersionInfo:
     # Defaults to not present.
     #=================================================#
     trademark_text: str | None = None
+#!SECTION
 
+#SECTION Full Config DataClass
 @export
 @dataclass
 class NuitkaConfig:
@@ -453,3 +466,4 @@ class NuitkaConfig:
     data: Data = field(default_factory=Data)
     debug: Debug = field(default_factory=Debug)
     logging: Logging = field(default_factory=Logging)
+#!SECTION
