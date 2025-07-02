@@ -3,6 +3,9 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Optional
 
+from nuitka_config.utils.export_class import export
+
+@export
 class BuildMode(StrEnum):
     #=================================================#
     # Compiles a Python script into a loadable Python extension module 
@@ -17,6 +20,7 @@ class BuildMode(StrEnum):
     #=================================================#
     executable = "executable" 
     
+@export
 class BuildResult(StrEnum):
     #=================================================#
     # IDK
@@ -45,6 +49,7 @@ class BuildResult(StrEnum):
     #=================================================#
     onefile = "onefile"
     
+@export
 @dataclass
 class Core:
     """What you're compiling. Entrypoint and packaging mode.
@@ -53,6 +58,7 @@ class Core:
     mode: BuildMode = BuildMode.executable
     result: BuildResult = BuildResult.standalone
 
+@export
 @dataclass
 class Output:
     """Where output goes and naming behavior.
@@ -62,6 +68,7 @@ class Output:
     remove_output: bool = True
     show_progress: bool = True
 
+@export
 @dataclass
 class Optimization:
     """Performance-related toggles.
@@ -72,12 +79,14 @@ class Optimization:
     prefer_source_code: bool = True
     static_libpython: bool = False
 
+@export
 @dataclass
 class Parallel:
     """Compilation speed (e.g. --jobs).
     """
     jobs: int = 4
 
+@export
 @dataclass
 class Python:
     """Python version and flags.
@@ -85,12 +94,14 @@ class Python:
     python_version = "3.11"
     flags: list[str] = field(default_factory=lambda: ["no_site"])  # --python-flag=
 
+@export
 class Compilers(StrEnum):
     mingw64 = "mingw64"
     clang = "clang"
     msvc = "msvc"
     gcc = "gcc"
 
+@export
 @dataclass
 class Compiler:
     """Control C compiler backend and build mechanics.
@@ -98,6 +109,7 @@ class Compiler:
     backend: Optional[Compilers] = None  # Choose automatically or platform-specific
     follow_symlinks: bool = False
 
+@export
 @dataclass
 class Plugins:
     """Plugin enablement and configuration.
@@ -139,6 +151,7 @@ class Plugins:
     #=================================================#
     trace_plugins: bool = False
 
+@export
 @dataclass
 class Packages:
     """Manual module/package inclusion/exclusion.
@@ -176,6 +189,7 @@ class Packages:
     #=================================================#
     nofollow_to: list[str] = field(default_factory=list)
 
+@export
 @dataclass
 class Data:
     """Embedding data files and directories.
@@ -183,6 +197,7 @@ class Data:
     include_files: list[Path] = field(default_factory=list)
     include_dirs: list[Path] = field(default_factory=list)
     
+@export
 @dataclass
 class Debug:
     """Debug symbols and runtime tracing.
@@ -193,6 +208,7 @@ class Debug:
     show_memory: bool = False
     show_modules: bool = True
 
+@export
 @dataclass
 class Logging:
     """Console verbosity and diagnostics.
@@ -200,6 +216,80 @@ class Logging:
     verbose: bool = False
     quiet: bool = False
 
+@export
+@dataclass
+class BinaryVersionInfo:
+    company_name: str = "UNKNOWN"
+    product_name: str = "MY_PROGRAM"
+    file_version: str = "0.0.0-dev"
+
+@export
+@dataclass
+class OSControls:
+    #=================================================#
+    #STUB - Ambiguous
+    # Force standard output of the program to go to this location. 
+    #  Useful for programs with disabled console and programs using 
+    #   the Windows Services Plugin of Nuitka commercial. 
+    # Defaults to not active, 
+    #   use e.g. '{PROGRAM_BASE}.out.txt', i.e. file near your program.
+    # Check User Manual for full list of available values.
+    #=================================================#
+    force_stdout: str | None = None
+    
+    #=================================================#
+    #STUB - Ambiguous
+    # Force standard error of the program to go to this location. 
+    # Useful for programs with disabled console and programs using 
+    #   the Windows Services Plugin of Nuitka commercial. 
+    # Defaults to not active, 
+    #   use e.g. '{PROGRAM_BASE}.err.txt', i.e. file near your program.
+    # Check User Manual for full list of available values.
+    #=================================================#
+    force_stderr: str | None = None
+
+@export
+class WindowsConsoleMode(StrEnum):
+    # creates a console window unless the program was started from one.
+    force = "force"
+    
+    # With 'disable' it doesn't create or use a console at all.
+    disable = "disable"
+    
+    # With 'attach' an existing console will be used for outputs.
+    attach = "attach"
+    
+    # With 'hide' a newly spawned console will be hidden and an already
+    #   existing console will behave like 'force'. 
+    hide = "hide"
+
+@export
+@dataclass
+class WindowsOS:
+    # Select console mode to use. Default mode is 'force'.
+    console_mode: bool = WindowsConsoleMode.force
+    
+    # Add executable icon. Can be given multiple times for different 
+    #   resolutions or files with multiple icons inside.
+    icon_from_ico: Path | None = None
+    
+    # Copy executable icons from this existing executable (Windows only).
+    icon_from_exe: Path | None = None
+    
+    # When compiling for Windows and onefile, show this
+    #   while loading the application. Defaults to off.
+    slash_screen: str = ""
+    
+    # Request Windows User Control, to grant admin rights on
+    #   execution. (Windows only). Defaults to off.
+    uac_admin: bool = False
+    
+    # Request Windows User Control, to enforce running from 
+    #   a few folders only, remote desktop access. 
+    #   (Windows only). Defaults to off.
+    uac_uiaccess: bool = False
+
+@export
 @dataclass
 class NuitkaConfig:
     core: Core = field(default_factory=Core) 
@@ -213,18 +303,3 @@ class NuitkaConfig:
     data: Data = field(default_factory=Data)
     debug: Debug = field(default_factory=Debug)
     logging: Logging = field(default_factory=Logging)
-
-__all__ = [
-    # Main Config Model
-    "NuitkaConfig", 
-    
-    # Its Sub-Models
-    "Core", "Output", "Optimization", 
-    "Parallel", "Python", "Compiler", "Plugins", "Packages",
-    "Data", "Debug", "Logging",
-    
-    # Choice Models
-    "BuildMode",
-    "BuildResult",
-    "Compilers",
-    ]
