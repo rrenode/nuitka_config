@@ -16,9 +16,9 @@ def serialize_value(cli_name: str, value) -> list[str]:
     elif isinstance(value, list):
         return iterable_serializer(cli_name=cli_name)(value)
     elif isinstance(value, Path):
-        return [f"--{cli_name}", str(value.as_posix())]
+        return [f"--{cli_name}={str(value.as_posix())}"]
     elif value is not None:
-        return [f"--{cli_name}", str(value)]
+        return [f"--{cli_name}={str(value)}"]
     return []
 
 def _config_to_args(config) -> list[str]:
@@ -42,20 +42,37 @@ def _config_to_args(config) -> list[str]:
 
     return args
 
+from dataclasses import replace, fields, is_dataclass
+
 def serialize_config(config: NuitkaConfig) -> list[str]:
     args = []
 
+    # Build mode flag (manual)
     if isinstance(config.build_mode, str):
         args.append(f"--{config.build_mode}")
-    elif config.build_mode != BuildMode.default:
+    elif config.build_mode and config.build_mode != BuildMode.default:
         args.append(f"--{config.build_mode.value}")
 
-    # Preserve nested dataclasses by using `replace`
-    temp_config = replace(config, build_mode=None)
+    # Special case: handle --run manually
+    if config.post_compile and config.post_compile.run:
+        args.append("--run")
+
+    # Remove run=True from post_compile before serialization
+    cleaned_post_compile = replace(config.post_compile, run=None)
+
+    # Replace post_compile and build_mode before general serialization
+    temp_config = replace(config,
+        build_mode=None,
+        post_compile=cleaned_post_compile
+    )
+
     args += _config_to_args(temp_config)
+    
+    if config.entry_file:
+        entry = config.entry_file
+        args.append(str(Path(entry).as_posix()))
 
     return args
-
 
 def load_spec_file(spec_path: Path):
     """Load a Python .spec.py file and extract the `config` object."""
