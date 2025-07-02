@@ -1,6 +1,7 @@
 # src/nuitka_config/__init__.py
 
 from .main import run  # CLI entry point
+from .utils.moduletools import collect_submodules
 from .builder import convert_to_nuitka_args, load_spec_file
 from .models import (
     # Main Config Model
