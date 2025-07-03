@@ -1160,7 +1160,7 @@ class CCompilerControl:
     # Defaults to "auto".
     #=================================================#
     lto: LTOChoice = field(
-        default=LTOChoice.auto,
+        default_factory=LTOChoice.auto,
         metadata={
             "serializer": enum_serializer("lto")
         }
