@@ -63,6 +63,18 @@ class PythonControls:
             "serializer": iterable_serializer("python-flag")
         }
     )
+    
+    #=================================================# 
+    # Use static link library of Python. 
+    # Allowed values are "yes", "no", and "auto" (when it's known to work).
+    # Defaults to "auto".
+    #=================================================#
+    static_lib: str = field(
+        default=None,
+        metadata={
+            "cli": "static-libpython"
+        }
+    )
 #!SECTION    
 
 #SECTION Package/Module Inclusion and Exclusion
@@ -1160,7 +1172,7 @@ class CCompilerControl:
     # Defaults to "auto".
     #=================================================#
     lto: LTOChoice = field(
-        default_factory=LTOChoice.auto,
+        default_factory=lambda: LTOChoice.auto,
         metadata={
             "serializer": enum_serializer("lto")
         }
@@ -1257,4 +1269,5 @@ class NuitkaConfig:
     caching: CacheControl = field(default_factory=CacheControl)
     tracing: TracingFeatures = field(default_factory=TracingFeatures)
     nuk_warns: NuitkaWarningControl = field(default_factory=NuitkaWarningControl)
+    extras: str | list[str] = field(default="")
 #!SECTION

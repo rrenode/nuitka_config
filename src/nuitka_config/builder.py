@@ -68,6 +68,12 @@ def serialize_config(config: NuitkaConfig) -> list[str]:
 
     args += _config_to_args(temp_config)
     
+    if config.extras:
+        if isinstance(config.extras, str):
+            args += config.extras.split()
+        else:
+            args += list(config.extras)
+    
     if config.entry_file:
         entry = config.entry_file
         args.append(str(Path(entry).as_posix()))
