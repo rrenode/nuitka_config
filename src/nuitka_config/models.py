@@ -128,6 +128,17 @@ class Packages:
             "serializer": iterable_serializer("nofollow-import-to")
         }
     )
+    
+    #=================================================#
+    # Descend into all imported modules. 
+    # Defaults to on in standalone mode, otherwise off.
+    #=================================================#
+    follow_imports: bool = field(
+        default=False,
+        metadata={
+            "serializer": bool_flag_serializer("follow-imports")
+        }
+    )
 #!SECTION
 
 #SECTION OneFile Options
