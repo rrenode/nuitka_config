@@ -115,6 +115,18 @@ class Packages:
     )
     
     #=================================================#
+    # Follow to that module if used, or if a package, to the whole package. 
+    # Can be given multiple times. 
+    # Default empty.
+    #=================================================#
+    follow_packages: list[str] | None = field(
+        default=None,
+        metadata={
+            "serializer": iterable_serializer("follow-import-to")
+        }
+    )
+    
+    #=================================================#
     # Do not follow to that module name even if used, or 
     #   if a package name, to the whole package in any case, 
     #   overrides all other options. 
