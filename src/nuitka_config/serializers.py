@@ -33,6 +33,6 @@ def iterable_serializer(cli_name: str, *, value_transform=None):
 def bool_flag_serializer(cli_name: str, *, value_transform=None):
     def serializer(value) -> str | None:
         if value:
-            return [f"--cli_name"]
+            return [f"--{cli_name}"]
         return []
     return serializer
