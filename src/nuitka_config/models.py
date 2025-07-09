@@ -119,7 +119,7 @@ class Packages:
     # Can be given multiple times. 
     # Default empty.
     #=================================================#
-    follow_import_to: list[str] | None = field(
+    follow_import_to: list[str] | str | None = field(
         default=None,
         metadata={
             "serializer": iterable_serializer("follow-import-to")
