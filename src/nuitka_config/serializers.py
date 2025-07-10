@@ -15,7 +15,8 @@ def path_serializer(cli_name: str, *, value_transform=None):
 
 def enum_serializer(cli_name: str, *, value_tranform=None):
     def serializer(value: Enum) -> str:
-        return [f"--{cli_name}={value.value}"]
+        
+        return [f"--{cli_name}={value.value}"] if value else ""
     return serializer
 
 def iterable_serializer(cli_name: str, *, value_transform=None):
