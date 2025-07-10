@@ -791,8 +791,8 @@ class WindowsConsoleMode(StrEnum):
 @dataclass
 class WindowsOSControl:
     # Select console mode to use. Default mode is 'force'.
-    console_mode: WindowsConsoleMode = field(
-        default=WindowsConsoleMode.force,
+    console_mode: WindowsConsoleMode | None = field(
+        default=None,
         metadata={
             "serializer": enum_serializer("windows-console-mode")
         }
