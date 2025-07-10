@@ -81,6 +81,17 @@ def detect_nuitka():
         "module_available": py_module
     }
 
+def normalize_nuitka_cmd(cmd: list):
+    nuitka_paths = detect_nuitka()
+    exc = nuitka_paths.get("cli_path")
+    mod = nuitka_paths.get("module_available")
+    if mod:
+        cmd.insert(0, sys.executable)
+        cmd.insert(1, "-m")
+    elif exc:
+        cmd.insert(0, exc)
+    return cmd
+
 def main(args):
     from nuitka_config.builder import load_spec_file
     parsed_args, passthrough_args = parse_args(args)
@@ -99,17 +110,9 @@ def main(args):
         config = NuitkaConfig()
         cli_args = convert_config_to_args(config)
 
-    full_command = parsed_args.nuitka.split() + cli_args
+    cmd = parsed_args.nuitka.split() + cli_args
+    full_command = normalize_nuitka_cmd(cmd)
     
-    nuitka_paths = detect_nuitka()
-    exc = nuitka_paths.get("cli_path")
-    mod = nuitka_paths.get("module_available")
-    if mod:
-        full_command.insert(0, sys.executable)
-        full_command.insert(1, "-m")
-    elif exc:
-        full_command.insert(0, exc)
-
     _logger.debug("Resolved command: %s", full_command)
 
     if parsed_args.export_script:
