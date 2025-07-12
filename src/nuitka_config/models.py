@@ -1269,8 +1269,8 @@ class BuildMode(StrEnum):
 @export
 @dataclass
 class NuitkaConfig:
-    entry_file: Path = field(
-        default=Path("__main__.py")
+    entry_file: Path | None = field(
+        default=None
     )
     build_mode: BuildMode = field(
         default=BuildMode.default

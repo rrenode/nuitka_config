@@ -45,6 +45,7 @@ def _config_to_args(config) -> list[str]:
 from dataclasses import replace, fields, is_dataclass
 
 def serialize_config(config: NuitkaConfig) -> list[str]:
+    """Convert a NuitkaConfig dataclass into CLI arguments."""
     args = []
 
     # Build mode flag (manual)

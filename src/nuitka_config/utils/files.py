@@ -1,6 +1,8 @@
 from pathlib import Path
 
 def write_script(path: Path, command: list[str], runner: str = "nuitka"):
+    if isinstance(path, str):
+        path = Path(path)
     script_type = path.suffix.lower()
     command = [runner] + command
 

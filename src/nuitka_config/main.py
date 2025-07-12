@@ -23,6 +23,7 @@ import argparse
 import logging
 import subprocess
 import sys
+import warnings
 from pathlib import Path
 
 __author__ = "rrenode"
@@ -112,7 +113,8 @@ def main(args):
 
     cmd = parsed_args.nuitka.split() + cli_args
     full_command = normalize_nuitka_cmd(cmd)
-    
+    if "-m" not in full_command:
+        _logger.warning("Nuitka executed through its binary instead of a module — may be using an unintended Python environment.")
     _logger.debug("Resolved command: %s", full_command)
 
     if parsed_args.export_script:
